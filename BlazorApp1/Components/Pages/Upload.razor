@@ -1,0 +1,85 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject IConfiguration config
+
+<PageTitle>Home</PageTitle>
+
+<h1>Subir archivos</h1>
+
+<InputFile OnChange="@LoadFiles" class="form-control" multiple />
+
+@if (uploadSuccess)
+{
+    <p class="text-success">¡Archivos subidos exitosamente!</p>
+}
+
+@if (errors.Count > 0)
+{
+    <p>Errores</p>
+    <ul class="text-danger">
+        @foreach (var error in errors)
+        {
+            <li>@error</li>
+        }
+    </ul>
+}
+
+@if (uploadedFiles.Count > 0)
+{
+    <h3>Archivos subidos:</h3>
+    <ul>
+        @foreach (var file in uploadedFiles)
+        {
+            <li>@file</li>
+        }
+    </ul>
+}
+
+@code {
+
+    private long maxFileSize = 1024 * 1024 * 7; // Representa 7MB
+    private int maxAllowedFiles = 5; 
+    private List<string> errors = new();
+    private bool uploadSuccess = false; 
+    private List<string> uploadedFiles = new(); 
+
+    private async Task LoadFiles(InputFileChangeEventArgs e)
+    {
+        errors.Clear();
+        uploadSuccess = false;
+
+        if (e.FileCount > maxAllowedFiles)
+        {
+            errors.Add($"Error: Intentando subir {e.FileCount} archivos, pero solo {maxAllowedFiles} archivos han sido permitidos");
+            return;
+        }
+
+        foreach (var file in e.GetMultipleFiles(maxAllowedFiles))
+        {
+            try
+            {
+                string newFileName = Path.ChangeExtension(Path.GetRandomFileName(), Path.GetExtension(file.Name));
+
+                string path = Path.Combine("files", newFileName);
+
+                Directory.CreateDirectory("files");
+
+                await using FileStream fs = new(path, FileMode.Create);
+                await file.OpenReadStream(maxFileSize).CopyToAsync(fs);
+
+                uploadedFiles.Add(newFileName); 
+
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"File: {file.Name} Error: {ex.Message}");
+                throw;
+            }
+        }
+
+        if (errors.Count == 0)
+        {
+            uploadSuccess = true;
+        }
+    }
+}
